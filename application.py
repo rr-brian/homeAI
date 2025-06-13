@@ -35,28 +35,42 @@ logger.info(f"Current working directory: {os.getcwd()}")
 logger.info(f"Directory contents: {os.listdir(os.getcwd())}")
 logger.info(f"Python path: {sys.path}")
 
-# Set default environment variables if they don't exist
-default_env_vars = {
-    'AZURE_OPENAI_ENDPOINT': 'https://example.openai.azure.com/',
-    'AZURE_OPENAI_DEPLOYMENT': 'gpt-35-turbo',
-    'AZURE_OPENAI_API_KEY': 'dummy_key_for_development',
-    'AZURE_AI_SEARCH_ENDPOINT': 'https://example.search.windows.net',
-    'AZURE_AI_SEARCH_INDEX': 'example-index',
-    'AZURE_AI_SEARCH_API_KEY': 'dummy_key_for_development',
-    'AZURE_GEN_SEARCH_ENDPOINT': 'https://example.cognitiveservices.azure.com/',
-    'AZURE_GEN_SEARCH_DEPLOYMENT': 'gpt-35-turbo',
-    'AZURE_GEN_SEARCH_API_KEY': 'dummy_key_for_development',
-    'FLASK_ENV': 'development',
-    'FLASK_DEBUG': '1'
-}
+# Set default values for missing environment variables
+for env_var, default_value in [
+    ('AZURE_AI_SEARCH_ENDPOINT', 'https://example.search.windows.net'),
+    ('AZURE_AI_SEARCH_INDEX', 'example-index'),
+    ('AZURE_AI_SEARCH_API_KEY', 'example-key'),
+    ('AZURE_OPENAI_API_KEY', 'example-key'),
+    ('AZURE_OPENAI_ENDPOINT', 'https://example.openai.azure.com'),
+    ('AZURE_OPENAI_DEPLOYMENT', 'example-deployment'),
+    ('AZURE_GEN_SEARCH_ENDPOINT', 'https://example.openai.azure.com'),
+    ('AZURE_GEN_SEARCH_API_KEY', 'example-key'),
+    ('AZURE_GEN_SEARCH_DEPLOYMENT', 'example-deployment'),
+]:
+    if not os.environ.get(env_var):
+        os.environ[env_var] = default_value
+        logger.info(f"Setting default value for missing {env_var}")
 
-# Set default environment variables if they don't exist
-for key, value in default_env_vars.items():
-    if key not in os.environ:
-        logger.info(f"Setting default value for missing environment variable: {key}")
-        os.environ[key] = value
-    else:
-        logger.info(f"Using existing environment variable: {key}")
+# Determine if we're running in development mode with placeholder values
+DEV_MODE = (
+    os.environ.get('AZURE_AI_SEARCH_ENDPOINT') == 'https://example.search.windows.net' or
+    os.environ.get('AZURE_AI_SEARCH_API_KEY') == 'example-key'
+)
+
+# Determine if we're running in Azure App Service
+RUNNING_IN_AZURE = os.environ.get('WEBSITE_SITE_NAME') is not None
+
+if DEV_MODE:
+    logger.warning("Running in DEVELOPMENT MODE with placeholder credentials. Some features will be limited.")
+if RUNNING_IN_AZURE:
+    logger.info("Running in Azure App Service environment")
+    # Log important Azure environment variables
+    logger.info(f"Azure site name: {os.environ.get('WEBSITE_SITE_NAME')}")
+    logger.info(f"Azure instance ID: {os.environ.get('WEBSITE_INSTANCE_ID')}")
+    logger.info(f"Azure hostname: {os.environ.get('WEBSITE_HOSTNAME')}")
+    logger.info(f"Azure deployment ID: {os.environ.get('DEPLOYMENT_ID', 'Not available')}")
+    # Set Flask to production mode in Azure
+    os.environ['FLASK_ENV'] = 'production'
 
 # Function to check if a module exists
 def module_exists(module_name):
@@ -86,17 +100,21 @@ try:
     else:
         # Create dummy versions
         logger.warning("Could not import search client, using dummy version")
-        class SearchClient:
-            def __init__(self):
-                self.cognitive_search_client = None
-                logger.warning("Using dummy SearchClient")
-                
-            def search_contract_language(self, query):
-                return [{"error": "SearchClient not properly initialized"}]
-                
-        def load_env():
-            logger.warning("Using dummy load_env function")
-            return {}
+        raise ImportError("Could not import search client modules")
+except Exception as e:
+    logger.warning(f"Exception during import: {e}")
+    # Continue with dummy versions
+    class SearchClient:
+        def __init__(self):
+            self.cognitive_search_client = None
+            logger.warning("Using dummy SearchClient")
+            
+        def search_contract_language(self, query):
+            return [{"error": "SearchClient not properly initialized"}]
+            
+    def load_env():
+        logger.warning("Using dummy load_env function")
+        return {}
     
     # Load environment variables
     logger.info('Loading environment variables...')
@@ -104,29 +122,85 @@ try:
     logger.info(f'Using search index: {os.getenv("AZURE_AI_SEARCH_INDEX")}')
     logger.info(f'Using search endpoint: {os.getenv("AZURE_AI_SEARCH_ENDPOINT")}')
     
-    # Initialize search client
-    logger.info('Initializing search client...')
-    search_client = SearchClient()
-    logger.info('Search client initialized')
-    
-except Exception as e:
-    logger.error(f"Error initializing search client: {e}")
-    logger.error(traceback.format_exc())
-    # Create dummy versions as fallback
-    class SearchClient:
-        def __init__(self):
-            self.cognitive_search_client = None
-            logger.warning("Using dummy SearchClient due to error")
-            
-        def search_contract_language(self, query):
-            return [{"error": "SearchClient not properly initialized due to error"}]
-            
-    search_client = SearchClient()
+    # Import and initialize search client
+    if DEV_MODE:
+        # In development mode, use a mock search client
+        logger.info("Using mock SearchClient in development mode")
+        class SearchClient:
+            def __init__(self):
+                self.cognitive_search_client = None
+                logger.warning("Using mock SearchClient in development mode")
+                
+            def search_contract_language(self, query):
+                # Return mock search results
+                return [
+                    {"title": "Sample Document 1", "content": "This is a sample search result.", "score": 0.95},
+                    {"title": "Sample Document 2", "content": "Another sample search result.", "score": 0.85}
+                ]
+        
+        search_client = SearchClient()
+        logger.info("Mock search client initialized")
+    else:
+        # In production mode, use the real search client
+        try:
+            from backend.rt_search.search_client import SearchClient
+            logger.info("Successfully imported SearchClient")
+            search_client = SearchClient()
+            logger.info("Search client initialized")
+        except Exception as e:
+            logger.error(f"Error initializing search client: {e}")
+            logger.error(traceback.format_exc())
+            # Create dummy versions as fallback
+            class SearchClient:
+                def __init__(self):
+                    self.cognitive_search_client = None
+                    logger.warning("Using dummy SearchClient due to error")
+                    
+                def search_contract_language(self, query):
+                    return [{"error": "SearchClient not properly initialized due to error"}]
+                    
+            search_client = SearchClient()
 
-# Routes
+# API endpoints
 @app.route('/api/test')
 def test():
     return jsonify({"status": "ok", "message": "API is working"})
+
+@app.route('/api/diagnostics')
+def diagnostics():
+    """Diagnostic endpoint to help troubleshoot Azure deployment issues"""
+    try:
+        return jsonify({
+            "status": "ok",
+            "environment": {
+                "dev_mode": DEV_MODE,
+                "running_in_azure": RUNNING_IN_AZURE,
+                "python_version": sys.version,
+                "flask_env": os.environ.get('FLASK_ENV', 'not set'),
+                "app_service_name": os.environ.get('WEBSITE_SITE_NAME', 'not set'),
+                "hostname": os.environ.get('WEBSITE_HOSTNAME', 'not set'),
+                "instance_id": os.environ.get('WEBSITE_INSTANCE_ID', 'not set'),
+                "deployment_id": os.environ.get('DEPLOYMENT_ID', 'not set'),
+                "current_directory": os.getcwd(),
+                "directory_contents": os.listdir(os.getcwd()),
+                "build_exists": os.path.exists('build'),
+                "build_contents": os.listdir('build') if os.path.exists('build') else [],
+                "static_folder": app.static_folder,
+                "static_folder_exists": os.path.exists(app.static_folder) if app.static_folder else False,
+                "static_folder_contents": os.listdir(app.static_folder) if app.static_folder and os.path.exists(app.static_folder) else []
+            }
+        })
+    except Exception as e:
+        logger.error(f"Error in diagnostics endpoint: {e}")
+        return jsonify({
+            "status": "error",
+            "message": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+@app.route('/test.html')
+def test_html():
+    return send_from_directory(os.getcwd(), 'test.html')
 
 @app.route('/test')
 def simple_test():
@@ -179,32 +253,29 @@ def search():
 def index(path):
     try:
         logger.info(f"Serving path: {path}")
-        logger.info(f"Current directory: {os.getcwd()}")
-        logger.info(f"Static folder: {app.static_folder}")
-        logger.info(f"Directory contents: {os.listdir(os.getcwd())}")
         
-        # Check if build directory exists in the current directory
-        if os.path.exists('build'):
-            logger.info(f"Build directory exists: {os.listdir('build')}")
-            
-            # First, try to serve the file as a static file from the build directory
-            if path and os.path.exists(os.path.join('build', path)):
-                logger.info(f"Serving file from build directory: {path}")
-                return send_from_directory('build', path)
-            
-            # If not found or no path, serve index.html from the build directory
-            if os.path.exists(os.path.join('build', 'index.html')):
-                logger.info("Serving index.html from build directory")
-                return send_from_directory('build', 'index.html')
+        # Special case for API endpoints
+        if path.startswith('api/'):
+            return jsonify({"error": "API endpoint not found"}), 404
         
-        # If we get here, try the app.static_folder
-        if path and os.path.exists(os.path.join(app.static_folder, path)):
-            logger.info(f"Serving file from static folder: {path}")
-            return send_from_directory(app.static_folder, path)
+        # Check for static files in build/static directory (most common for React apps)
+        if path.startswith('static/') and os.path.exists(os.path.join('build', path)):
+            logger.info(f"Serving static file: {path}")
+            return send_from_directory('build', path)
         
-        # If not found or no path, serve index.html from the static folder
-        if os.path.exists(os.path.join(app.static_folder, 'index.html')):
-            logger.info("Serving index.html from static folder")
+        # Check for any other files in the build directory
+        if path and os.path.exists(os.path.join('build', path)):
+            logger.info(f"Serving file from build directory: {path}")
+            return send_from_directory('build', path)
+        
+        # For all other paths, serve the React app's index.html
+        if os.path.exists(os.path.join('build', 'index.html')):
+            logger.info(f"Serving index.html for path: {path}")
+            return send_from_directory('build', 'index.html')
+        
+        # If build/index.html doesn't exist, check if we have a static folder
+        if app.static_folder and os.path.exists(os.path.join(app.static_folder, 'index.html')):
+            logger.info(f"Serving index.html from static folder for path: {path}")
             return send_from_directory(app.static_folder, 'index.html')
         
         # If we get here, nothing worked, return a diagnostic response
@@ -217,10 +288,8 @@ def index(path):
             "cwd": os.getcwd(),
             "directory_contents": os.listdir(os.getcwd()),
             "build_exists": os.path.exists('build'),
-            "build_contents": os.listdir('build') if os.path.exists('build') else [],
-            "static_folder_exists": os.path.exists(app.static_folder),
-            "static_folder_contents": os.listdir(app.static_folder) if os.path.exists(app.static_folder) else []
-        })
+            "build_contents": os.listdir('build') if os.path.exists('build') else []
+        }), 404
     except Exception as e:
         logger.error(f"Error serving {path or 'index.html'}: {e}")
         return jsonify({

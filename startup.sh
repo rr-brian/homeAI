@@ -24,15 +24,18 @@ pip install -r requirements.txt
 echo "Installing local rt_search module..."
 pip install -e .
 
-# Try to find and run app.py
-if [ -f "app.py" ]; then
+# Try to find and run the application
+if [ -f "application.py" ]; then
+    echo "Found application.py, running with gunicorn"
+    gunicorn --bind=0.0.0.0:8000 --log-level debug application:app
+elif [ -f "app.py" ]; then
     echo "Found app.py, running directly"
     python app.py
 elif [ -f "wsgi.py" ]; then
     echo "Found wsgi.py, running with gunicorn"
     gunicorn --bind=0.0.0.0:8000 --log-level debug wsgi:app
 else
-    echo "ERROR: Could not find app.py or wsgi.py"
+    echo "ERROR: Could not find application.py, app.py or wsgi.py"
     echo "Directory contents: $(ls -la)"
     exit 1
 fi

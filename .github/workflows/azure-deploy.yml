@@ -46,15 +46,22 @@ jobs:
         # Create a simple startup command file that Azure will recognize
         echo "#!/bin/bash" > run.sh
         echo "cd /home/site/wwwroot" >> run.sh
-        echo "python app.py" >> run.sh
+        echo "gunicorn --bind=0.0.0.0 --timeout 600 application:app" >> run.sh
         chmod +x run.sh
         
         # List all important files to verify they exist
         echo "Checking for critical files:"
-        echo "app.py exists: $(test -f app.py && echo YES || echo NO)"
+        echo "application.py exists: $(test -f application.py && echo YES || echo NO)"
         echo "wsgi.py exists: $(test -f wsgi.py && echo YES || echo NO)"
         echo "backend/wsgi.py exists: $(test -f backend/wsgi.py && echo YES || echo NO)"
         echo "requirements.txt exists: $(test -f requirements.txt && echo YES || echo NO)"
+        echo ".deployment exists: $(test -f .deployment && echo YES || echo NO)"
+        echo "web.config exists: $(test -f web.config && echo YES || echo NO)"
+        echo "handler.fcgi exists: $(test -f handler.fcgi && echo YES || echo NO)"
+        echo "build directory exists: $(test -d build && echo YES || echo NO)"
+        
+        # Make handler.fcgi executable
+        chmod +x handler.fcgi
         
         # Show the deployment files
         echo "Deployment files:"
@@ -70,6 +77,8 @@ jobs:
       uses: azure/login@v1
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
+      # Note: Make sure AZURE_CREDENTIALS secret is set in GitHub repository settings
+      # Format should be: {"clientId":"<client-id>","clientSecret":"<client-secret>","subscriptionId":"<subscription-id>","tenantId":"<tenant-id>"}
         
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v2
