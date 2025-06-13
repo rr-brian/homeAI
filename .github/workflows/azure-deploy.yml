@@ -28,6 +28,12 @@ jobs:
       with:
         python-version: '3.9'
         
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -e .
+        
     - name: Prepare for deployment
       run: |
         echo "Current directory: $(pwd)"
@@ -35,14 +41,30 @@ jobs:
         
         # Make startup script executable
         chmod +x _startup.sh
+        chmod +x startup.sh
         
         # Create a simple startup command file that Azure will recognize
-        echo "gunicorn --bind=0.0.0.0:8000 wsgi:app" > startup.sh
-        chmod +x startup.sh
+        echo "#!/bin/bash" > run.sh
+        echo "cd /home/site/wwwroot" >> run.sh
+        echo "python app.py" >> run.sh
+        chmod +x run.sh
+        
+        # List all important files to verify they exist
+        echo "Checking for critical files:"
+        echo "app.py exists: $(test -f app.py && echo YES || echo NO)"
+        echo "wsgi.py exists: $(test -f wsgi.py && echo YES || echo NO)"
+        echo "backend/wsgi.py exists: $(test -f backend/wsgi.py && echo YES || echo NO)"
+        echo "requirements.txt exists: $(test -f requirements.txt && echo YES || echo NO)"
         
         # Show the deployment files
         echo "Deployment files:"
         ls -la
+        
+    - name: Create deployment package
+      run: |
+        # Create a zip file with all necessary files
+        zip -r deploy.zip . -x "*.git*" "node_modules/*" "venv/*"
+        echo "Deployment package created"
         
     - name: Login to Azure
       uses: azure/login@v1
@@ -54,4 +76,4 @@ jobs:
       with:
         app-name: 'AIhome' # Updated to the new App Service name
         slot-name: 'production'
-        package: .
+        package: ./deploy.zip
