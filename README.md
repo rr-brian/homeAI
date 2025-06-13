@@ -1,6 +1,6 @@
 # HomeAI - AI-Powered Real Estate Search
 
-A unified full-stack application combining a React frontend with a Python Flask backend for AI-powered real estate document search using Azure Cognitive Search and Azure OpenAI.
+A unified full-stack application combining a React frontend with a Python Flask backend for AI-powered real estate document search using Azure Cognitive Search and Azure OpenAI. Deployed to Azure App Service.
 
 ## Features
 
