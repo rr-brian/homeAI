@@ -124,10 +124,29 @@ except Exception as e:
     search_client = SearchClient()
 
 # Routes
-@app.route('/api/test', methods=['GET'])
+@app.route('/api/test')
 def test():
-    logger.info('Test endpoint called')
-    return jsonify({'status': 'ok', 'message': 'API is working'})
+    return jsonify({"status": "ok", "message": "API is working"})
+
+@app.route('/test')
+def simple_test():
+    return jsonify({
+        "status": "ok", 
+        "message": "Simple test endpoint is working",
+        "environment": {
+            "PYTHONPATH": os.environ.get("PYTHONPATH", "Not set"),
+            "HOME": os.environ.get("HOME", "Not set"),
+            "WEBSITE_SITE_NAME": os.environ.get("WEBSITE_SITE_NAME", "Not set"),
+            "PORT": os.environ.get("PORT", "Not set"),
+            "HTTP_PLATFORM_PORT": os.environ.get("HTTP_PLATFORM_PORT", "Not set")
+        },
+        "file_system": {
+            "cwd": os.getcwd(),
+            "directory_contents": os.listdir(os.getcwd()),
+            "build_exists": os.path.exists(os.path.join(os.getcwd(), "build")),
+            "build_contents": os.listdir(os.path.join(os.getcwd(), "build")) if os.path.exists(os.path.join(os.getcwd(), "build")) else []
+        }
+    })
 
 @app.route('/api/search', methods=['POST'])
 def search():
@@ -159,19 +178,56 @@ def search():
 @app.route('/<path:path>')
 def index(path):
     try:
-        # First, try to serve the file as a static file
+        logger.info(f"Serving path: {path}")
+        logger.info(f"Current directory: {os.getcwd()}")
+        logger.info(f"Static folder: {app.static_folder}")
+        logger.info(f"Directory contents: {os.listdir(os.getcwd())}")
+        
+        # Check if build directory exists in the current directory
+        if os.path.exists('build'):
+            logger.info(f"Build directory exists: {os.listdir('build')}")
+            
+            # First, try to serve the file as a static file from the build directory
+            if path and os.path.exists(os.path.join('build', path)):
+                logger.info(f"Serving file from build directory: {path}")
+                return send_from_directory('build', path)
+            
+            # If not found or no path, serve index.html from the build directory
+            if os.path.exists(os.path.join('build', 'index.html')):
+                logger.info("Serving index.html from build directory")
+                return send_from_directory('build', 'index.html')
+        
+        # If we get here, try the app.static_folder
         if path and os.path.exists(os.path.join(app.static_folder, path)):
+            logger.info(f"Serving file from static folder: {path}")
             return send_from_directory(app.static_folder, path)
-        # If not found or no path, serve index.html
-        return send_from_directory(app.static_folder, 'index.html')
+        
+        # If not found or no path, serve index.html from the static folder
+        if os.path.exists(os.path.join(app.static_folder, 'index.html')):
+            logger.info("Serving index.html from static folder")
+            return send_from_directory(app.static_folder, 'index.html')
+        
+        # If we get here, nothing worked, return a diagnostic response
+        logger.error("Could not find any static files to serve")
+        return jsonify({
+            "status": "error",
+            "message": "Application is running but could not find static files",
+            "path_requested": path,
+            "static_folder": app.static_folder,
+            "cwd": os.getcwd(),
+            "directory_contents": os.listdir(os.getcwd()),
+            "build_exists": os.path.exists('build'),
+            "build_contents": os.listdir('build') if os.path.exists('build') else [],
+            "static_folder_exists": os.path.exists(app.static_folder),
+            "static_folder_contents": os.listdir(app.static_folder) if os.path.exists(app.static_folder) else []
+        })
     except Exception as e:
         logger.error(f"Error serving {path or 'index.html'}: {e}")
         return jsonify({
             "status": "error",
             "message": f"Failed to serve {path or 'index.html'}",
             "error": str(e),
-            "path": os.path.join(os.getcwd(), app.static_folder, path or 'index.html'),
-            "exists": os.path.exists(os.path.join(os.getcwd(), app.static_folder, path or 'index.html')),
+            "path": path,
             "static_folder": app.static_folder,
             "cwd": os.getcwd(),
             "directory_contents": os.listdir(os.getcwd()) if os.path.exists(os.getcwd()) else []
