@@ -70,7 +70,7 @@ def module_exists(module_name):
 from flask import Flask, jsonify, send_from_directory, request
 from flask_cors import CORS
 
-app = Flask(__name__, static_folder='build')
+app = Flask(__name__, static_folder='build', static_url_path='')
 CORS(app)
 
 # Try to import the search client
@@ -157,21 +157,25 @@ def search():
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
-def serve(path):
-    logger.info(f'Serving path: {path}')
-    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
-        return send_from_directory(app.static_folder, path)
-    else:
-        try:
-            return send_from_directory(app.static_folder, 'index.html')
-        except:
-            return jsonify({
-                "status": "error",
-                "message": "Application is running but static files not found",
-                "python_path": str(sys.path),
-                "current_directory": os.getcwd(),
-                "directory_contents": str(os.listdir(os.getcwd()))
-            })
+def index(path):
+    try:
+        # First, try to serve the file as a static file
+        if path and os.path.exists(os.path.join(app.static_folder, path)):
+            return send_from_directory(app.static_folder, path)
+        # If not found or no path, serve index.html
+        return send_from_directory(app.static_folder, 'index.html')
+    except Exception as e:
+        logger.error(f"Error serving {path or 'index.html'}: {e}")
+        return jsonify({
+            "status": "error",
+            "message": f"Failed to serve {path or 'index.html'}",
+            "error": str(e),
+            "path": os.path.join(os.getcwd(), app.static_folder, path or 'index.html'),
+            "exists": os.path.exists(os.path.join(os.getcwd(), app.static_folder, path or 'index.html')),
+            "static_folder": app.static_folder,
+            "cwd": os.getcwd(),
+            "directory_contents": os.listdir(os.getcwd()) if os.path.exists(os.getcwd()) else []
+        })
 
 # This allows the app to be run directly
 if __name__ == '__main__':
