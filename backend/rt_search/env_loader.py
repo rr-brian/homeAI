@@ -9,11 +9,14 @@ def load_env() -> Dict[str, str]:
     logger = logging.getLogger(__name__)
     logger.info('Loading environment variables...')
     
-    # Clear any existing environment variables
+    # Don't clear existing environment variables as they might be set by Azure App Service
+    # Just log what we have
     for key in ['AZURE_AI_SEARCH_INDEX', 'AZURE_AI_SEARCH_ENDPOINT', 'AZURE_AI_SEARCH_API_KEY',
                 'AZURE_OPENAI_ENDPOINT', 'AZURE_OPENAI_DEPLOYMENT', 'AZURE_OPENAI_API_KEY']:
         if key in os.environ:
-            del os.environ[key]
+            logger.info(f'Found existing environment variable: {key}')
+        else:
+            logger.info(f'Environment variable not found: {key}')
     
     # Read .env file directly first
     try:
