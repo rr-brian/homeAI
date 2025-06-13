@@ -83,8 +83,16 @@ def module_exists(module_name):
 # Create a simple Flask app as fallback
 from flask import Flask, jsonify, send_from_directory, request
 from flask_cors import CORS
+import os
 
-app = Flask(__name__, static_folder='build', static_url_path='')
+# Get the absolute path to the build directory
+build_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'build')
+logger.info(f"Build directory absolute path: {build_path}")
+logger.info(f"Build directory exists: {os.path.exists(build_path)}")
+if os.path.exists(build_path):
+    logger.info(f"Build directory contents: {os.listdir(build_path)}")
+
+app = Flask(__name__, static_folder=build_path, static_url_path='')
 CORS(app)
 
 # Try to import the search client
@@ -169,13 +177,44 @@ def test():
 @app.route('/api/diagnostics')
 def diagnostics():
     """Diagnostic endpoint to help troubleshoot Azure deployment issues"""
+    # Get the absolute build path
+    build_dir = app.static_folder
+    
+    # Check if index.html exists in the build directory
+    index_exists = os.path.exists(os.path.join(build_dir, "index.html")) if build_dir else False
+    
+    # Check if static/css and static/js directories exist
+    static_css_exists = os.path.exists(os.path.join(build_dir, "static", "css")) if build_dir else False
+    static_js_exists = os.path.exists(os.path.join(build_dir, "static", "js")) if build_dir else False
+    
+    # Get the contents of the static directories if they exist
+    static_css_contents = os.listdir(os.path.join(build_dir, "static", "css")) if static_css_exists else []
+    static_js_contents = os.listdir(os.path.join(build_dir, "static", "js")) if static_js_exists else []
+    
     try:
         return jsonify({
             "status": "ok",
+            "message": "Application is running",
+            "flask_app": {
+                "static_folder": app.static_folder,
+                "static_url_path": app.static_url_path,
+                "root_path": app.root_path
+            },
             "environment": {
-                "dev_mode": DEV_MODE,
-                "running_in_azure": RUNNING_IN_AZURE,
                 "python_version": sys.version,
+                "python_path": sys.path,
+                "AZURE_AI_SEARCH_ENDPOINT": os.environ.get("AZURE_AI_SEARCH_ENDPOINT", "Not set"),
+                "AZURE_AI_SEARCH_INDEX": os.environ.get("AZURE_AI_SEARCH_INDEX", "Not set"),
+                "AZURE_OPENAI_ENDPOINT": os.environ.get("AZURE_OPENAI_ENDPOINT", "Not set"),
+                "AZURE_OPENAI_DEPLOYMENT": os.environ.get("AZURE_OPENAI_DEPLOYMENT", "Not set"),
+                "FLASK_ENV": os.environ.get("FLASK_ENV", "Not set"),
+                "FLASK_DEBUG": os.environ.get("FLASK_DEBUG", "Not set"),
+                "WEBSITE_SITE_NAME": os.environ.get("WEBSITE_SITE_NAME", "Not set"),
+                "PORT": os.environ.get("PORT", "Not set"),
+                "HTTP_PLATFORM_PORT": os.environ.get("HTTP_PLATFORM_PORT", "Not set")
+            },
+            "file_system": {
+                "cwd": os.getcwd(),
                 "flask_env": os.environ.get('FLASK_ENV', 'not set'),
                 "app_service_name": os.environ.get('WEBSITE_SITE_NAME', 'not set'),
                 "hostname": os.environ.get('WEBSITE_HOSTNAME', 'not set'),
@@ -185,9 +224,7 @@ def diagnostics():
                 "directory_contents": os.listdir(os.getcwd()),
                 "build_exists": os.path.exists('build'),
                 "build_contents": os.listdir('build') if os.path.exists('build') else [],
-                "static_folder": app.static_folder,
-                "static_folder_exists": os.path.exists(app.static_folder) if app.static_folder else False,
-                "static_folder_contents": os.listdir(app.static_folder) if app.static_folder and os.path.exists(app.static_folder) else []
+                "static_folder": app.static_folder
             }
         })
     except Exception as e:
@@ -258,25 +295,24 @@ def index(path):
         if path.startswith('api/'):
             return jsonify({"error": "API endpoint not found"}), 404
         
+        # Get the absolute build path
+        build_dir = app.static_folder
+        logger.info(f"Using build directory: {build_dir}")
+        
         # Check for static files in build/static directory (most common for React apps)
-        if path.startswith('static/') and os.path.exists(os.path.join('build', path)):
+        if path.startswith('static/') and os.path.exists(os.path.join(build_dir, path)):
             logger.info(f"Serving static file: {path}")
-            return send_from_directory('build', path)
+            return send_from_directory(build_dir, path)
         
         # Check for any other files in the build directory
-        if path and os.path.exists(os.path.join('build', path)):
+        if path and os.path.exists(os.path.join(build_dir, path)):
             logger.info(f"Serving file from build directory: {path}")
-            return send_from_directory('build', path)
+            return send_from_directory(build_dir, path)
         
         # For all other paths, serve the React app's index.html
-        if os.path.exists(os.path.join('build', 'index.html')):
+        if os.path.exists(os.path.join(build_dir, 'index.html')):
             logger.info(f"Serving index.html for path: {path}")
-            return send_from_directory('build', 'index.html')
-        
-        # If build/index.html doesn't exist, check if we have a static folder
-        if app.static_folder and os.path.exists(os.path.join(app.static_folder, 'index.html')):
-            logger.info(f"Serving index.html from static folder for path: {path}")
-            return send_from_directory(app.static_folder, 'index.html')
+            return send_from_directory(build_dir, 'index.html')
         
         # If we get here, nothing worked, return a diagnostic response
         logger.error("Could not find any static files to serve")
@@ -287,8 +323,8 @@ def index(path):
             "static_folder": app.static_folder,
             "cwd": os.getcwd(),
             "directory_contents": os.listdir(os.getcwd()),
-            "build_exists": os.path.exists('build'),
-            "build_contents": os.listdir('build') if os.path.exists('build') else []
+            "build_exists": os.path.exists(build_dir),
+            "build_contents": os.listdir(build_dir) if os.path.exists(build_dir) else []
         }), 404
     except Exception as e:
         logger.error(f"Error serving {path or 'index.html'}: {e}")
