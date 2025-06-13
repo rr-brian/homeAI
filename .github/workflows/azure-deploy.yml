@@ -28,50 +28,21 @@ jobs:
       with:
         python-version: '3.9'
         
-    - name: Install Python dependencies
-      run: |
-        cd backend
-        pip install -r requirements.txt
-        
-    - name: Prepare deployment package
+    - name: Prepare for deployment
       run: |
         echo "Current directory: $(pwd)"
-        echo "Creating deployment package structure..."
+        echo "Preparing files for deployment..."
         
-        # Ensure critical files exist and are executable
-        if [ ! -f _startup.sh ]; then
-          echo "ERROR: _startup.sh does not exist in root directory"
-          exit 1
-        fi
-        
+        # Make startup script executable
         chmod +x _startup.sh
-        echo "_startup.sh permissions updated:"
-        ls -la _startup.sh
         
-        # Ensure wsgi.py exists in root
-        if [ ! -f wsgi.py ]; then
-          echo "ERROR: wsgi.py does not exist in root directory"
-          exit 1
-        fi
+        # Create a simple startup command file that Azure will recognize
+        echo "gunicorn --bind=0.0.0.0:8000 wsgi:app" > startup.sh
+        chmod +x startup.sh
         
-        # Ensure requirements.txt exists in root
-        if [ ! -f requirements.txt ]; then
-          echo "ERROR: requirements.txt does not exist in root directory"
-          exit 1
-        fi
-        
-        # Create a deployment directory
-        mkdir -p deploy
-        
-        # Copy all necessary files to deployment directory
-        cp -r build deploy/
-        cp -r backend deploy/
-        cp _startup.sh deploy/
-        cp wsgi.py deploy/
-        cp requirements.txt deploy/
-        
-        echo "Deployment package contents:"
-        ls -la deploy/
+        # Show the deployment files
+        echo "Deployment files:"
+        ls -la
         
     - name: Login to Azure
       uses: azure/login@v1
@@ -83,4 +54,4 @@ jobs:
       with:
         app-name: 'rts-search-app'
         slot-name: 'production'
-        package: ./deploy
+        package: .
