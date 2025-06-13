@@ -33,15 +33,39 @@ jobs:
         cd backend
         pip install -r requirements.txt
         
-    - name: Check startup script
+    - name: Debug deployment files
       run: |
+        echo "Current directory: $(pwd)"
+        echo "Directory contents:"
         ls -la
+        echo "\n_startup.sh status:"
         if [ -f _startup.sh ]; then
           echo "_startup.sh exists"
           chmod +x _startup.sh
+          echo "_startup.sh contents:"
           cat _startup.sh
         else
           echo "ERROR: _startup.sh does not exist"
+          exit 1
+        fi
+        
+        echo "\nwsgi.py status:"
+        if [ -f wsgi.py ]; then
+          echo "wsgi.py exists"
+          echo "wsgi.py contents:"
+          cat wsgi.py
+        else
+          echo "ERROR: wsgi.py does not exist"
+          exit 1
+        fi
+        
+        echo "\nrequirements.txt status:"
+        if [ -f requirements.txt ]; then
+          echo "requirements.txt exists"
+          echo "requirements.txt contents:"
+          cat requirements.txt
+        else
+          echo "ERROR: requirements.txt does not exist"
           exit 1
         fi
         
