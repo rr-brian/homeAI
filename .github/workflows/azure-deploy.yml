@@ -33,41 +33,45 @@ jobs:
         cd backend
         pip install -r requirements.txt
         
-    - name: Debug deployment files
+    - name: Prepare deployment package
       run: |
         echo "Current directory: $(pwd)"
-        echo "Directory contents:"
-        ls -la
-        echo "\n_startup.sh status:"
-        if [ -f _startup.sh ]; then
-          echo "_startup.sh exists"
-          chmod +x _startup.sh
-          echo "_startup.sh contents:"
-          cat _startup.sh
-        else
-          echo "ERROR: _startup.sh does not exist"
+        echo "Creating deployment package structure..."
+        
+        # Ensure critical files exist and are executable
+        if [ ! -f _startup.sh ]; then
+          echo "ERROR: _startup.sh does not exist in root directory"
           exit 1
         fi
         
-        echo "\nwsgi.py status:"
-        if [ -f wsgi.py ]; then
-          echo "wsgi.py exists"
-          echo "wsgi.py contents:"
-          cat wsgi.py
-        else
-          echo "ERROR: wsgi.py does not exist"
+        chmod +x _startup.sh
+        echo "_startup.sh permissions updated:"
+        ls -la _startup.sh
+        
+        # Ensure wsgi.py exists in root
+        if [ ! -f wsgi.py ]; then
+          echo "ERROR: wsgi.py does not exist in root directory"
           exit 1
         fi
         
-        echo "\nrequirements.txt status:"
-        if [ -f requirements.txt ]; then
-          echo "requirements.txt exists"
-          echo "requirements.txt contents:"
-          cat requirements.txt
-        else
-          echo "ERROR: requirements.txt does not exist"
+        # Ensure requirements.txt exists in root
+        if [ ! -f requirements.txt ]; then
+          echo "ERROR: requirements.txt does not exist in root directory"
           exit 1
         fi
+        
+        # Create a deployment directory
+        mkdir -p deploy
+        
+        # Copy all necessary files to deployment directory
+        cp -r build deploy/
+        cp -r backend deploy/
+        cp _startup.sh deploy/
+        cp wsgi.py deploy/
+        cp requirements.txt deploy/
+        
+        echo "Deployment package contents:"
+        ls -la deploy/
         
     - name: Login to Azure
       uses: azure/login@v1
@@ -79,4 +83,4 @@ jobs:
       with:
         app-name: 'rts-search-app'
         slot-name: 'production'
-        package: .
+        package: ./deploy
