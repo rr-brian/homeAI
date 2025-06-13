@@ -4,6 +4,27 @@ import sys
 # Add the backend directory to the path so we can import from it
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'backend')))
 
+# Set default environment variables if they don't exist
+default_env_vars = {
+    'AZURE_OPENAI_ENDPOINT': 'https://example.openai.azure.com/',
+    'AZURE_OPENAI_DEPLOYMENT': 'gpt-35-turbo',
+    'AZURE_OPENAI_API_KEY': 'dummy_key_for_development',
+    'AZURE_AI_SEARCH_ENDPOINT': 'https://example.search.windows.net',
+    'AZURE_AI_SEARCH_INDEX': 'example-index',
+    'AZURE_AI_SEARCH_API_KEY': 'dummy_key_for_development',
+    'AZURE_GEN_SEARCH_ENDPOINT': 'https://example.cognitiveservices.azure.com/',
+    'AZURE_GEN_SEARCH_DEPLOYMENT': 'gpt-35-turbo',
+    'AZURE_GEN_SEARCH_API_KEY': 'dummy_key_for_development',
+    'FLASK_ENV': 'development',
+    'FLASK_DEBUG': '1'
+}
+
+# Set default environment variables if they don't exist
+for key, value in default_env_vars.items():
+    if key not in os.environ:
+        print(f"Setting default value for missing environment variable: {key}")
+        os.environ[key] = value
+
 # Try different import approaches for rt_search
 try:
     # First try to add the rt_search module to the Python path

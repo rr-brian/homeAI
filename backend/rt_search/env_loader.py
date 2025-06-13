@@ -52,15 +52,30 @@ def load_env() -> Dict[str, str]:
         'AZURE_AI_SEARCH_API_KEY': 'Azure AI Search credential'
     }
     
-    # Check for missing variables
-    missing = []
+    # Default values for development environment
+    default_values = {
+        'AZURE_OPENAI_ENDPOINT': 'https://example.openai.azure.com/',
+        'AZURE_OPENAI_DEPLOYMENT': 'gpt-35-turbo',
+        'AZURE_OPENAI_API_KEY': 'dummy_key_for_development',
+        'AZURE_AI_SEARCH_ENDPOINT': 'https://example.search.windows.net',
+        'AZURE_AI_SEARCH_INDEX': 'example-index',
+        'AZURE_AI_SEARCH_API_KEY': 'dummy_key_for_development',
+        'AZURE_GEN_SEARCH_ENDPOINT': 'https://example.cognitiveservices.azure.com/',
+        'AZURE_GEN_SEARCH_DEPLOYMENT': 'gpt-35-turbo',
+        'AZURE_GEN_SEARCH_API_KEY': 'dummy_key_for_development',
+    }
+
+    # Check for missing environment variables
+    missing_vars = []
     env_vars = {}
-    
-    # Load each variable
-    for var, desc in required_vars.items():
+    for var, description in required_vars.items():
         value = os.getenv(var)
         if not value:
-            missing.append(f'{var} ({desc})')
+            missing_vars.append(f"{var} ({description})")
+            # Set default value in development mode
+            if os.environ.get('FLASK_ENV') == 'development' and var in default_values:
+                os.environ[var] = default_values[var]
+                logger.warning(f"Using default value for {var} in development mode")
         else:
             # Log variable found (without revealing sensitive values)
             if 'KEY' in var or 'CREDENTIAL' in var:
@@ -69,19 +84,32 @@ def load_env() -> Dict[str, str]:
             else:
                 logger.info(f'Found {var} in environment: {value}')
             env_vars[var] = value
-    
-    if missing:
-        error = f'Missing required environment variables: {", ".join(missing)}'
-        logger.error(error)
-        raise ValueError(error)
-    
+
+    if missing_vars:
+        error = f"Missing required environment variables: {', '.join(missing_vars)}"
+        logger.warning(error)
+        
+        # Only raise error if not in development mode
+        if os.environ.get('FLASK_ENV') != 'development':
+            raise ValueError(error)
+        else:
+            logger.warning("Continuing with default values in development mode")
+            
+    # Set optional environment variables with defaults if not present
+    for var, value in default_values.items():
+        if var not in required_vars and not os.environ.get(var):
+            os.environ[var] = value
+            logger.info(f"Set default value for optional variable {var}")
+            
     # Log summary
     logger.info('Environment variables loaded successfully:')
-    logger.info(f'OpenAI endpoint: {env_vars.get("AZURE_OPENAI_ENDPOINT", "[missing]")}')
-    logger.info(f'OpenAI deployment: {env_vars.get("AZURE_OPENAI_DEPLOYMENT", "[missing]")}')
-    logger.info(f'Search endpoint: {env_vars.get("AZURE_AI_SEARCH_ENDPOINT", "[missing]")}')
-    logger.info(f'Search index: {env_vars.get("AZURE_AI_SEARCH_INDEX", "[missing]")}')
+    logger.info(f'OpenAI endpoint: {env_vars.get("AZURE_OPENAI_ENDPOINT", "[missing]")}') 
+    logger.info(f'OpenAI deployment: {env_vars.get("AZURE_OPENAI_DEPLOYMENT", "[missing]")}') 
+    logger.info(f'Search endpoint: {env_vars.get("AZURE_AI_SEARCH_ENDPOINT", "[missing]")}') 
+    logger.info(f'Search index: {env_vars.get("AZURE_AI_SEARCH_INDEX", "[missing]")}') 
 
     # Log final status
     logger.info('Environment variables loaded successfully')
+            
+    # Return the environment variables
     return env_vars
