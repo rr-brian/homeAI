@@ -165,6 +165,9 @@ def create_app():
 
 app = create_app()
 
+# Expose the application variable that Azure App Service is looking for
+application = app
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8000))
     app.run(host='0.0.0.0', port=port)
