@@ -21,7 +21,13 @@ jobs:
       run: npm ci
       
     - name: Build React app
-      run: npm run build
+      run: |
+        echo "Building React app..."
+        npm run build
+        echo "React build completed"
+        echo "Build directory contents:"
+        ls -la build/
+        echo "Ensuring build directory is included in deployment"
       
     - name: Set up Python
       uses: actions/setup-python@v2
@@ -69,8 +75,25 @@ jobs:
         
     - name: Create deployment package
       run: |
+        # Verify build directory exists and has content
+        if [ ! -d "build" ] || [ -z "$(ls -A build)" ]; then
+          echo "ERROR: build directory is missing or empty!"
+          echo "Current directory contents:"
+          ls -la
+          exit 1
+        fi
+        
+        echo "Build directory exists and has content"
+        echo "Build directory contents:"
+        ls -la build/
+        
         # Create a zip file with all necessary files
         zip -r deploy.zip . -x "*.git*" "node_modules/*" "venv/*"
+        
+        # Verify the zip contains the build directory
+        echo "Verifying build directory in zip:"
+        unzip -l deploy.zip | grep -i build/
+        
         echo "Deployment package created"
         
     - name: Login to Azure
