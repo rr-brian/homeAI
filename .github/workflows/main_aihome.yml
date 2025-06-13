@@ -4,10 +4,11 @@
 
 name: Build and deploy Python app to Azure Web App - AIHome
 
+# Disabled automatic triggering to prevent duplicate deployments with azure-deploy.yml
 on:
-  push:
-    branches:
-      - main
+  # push:
+  #   branches:
+  #     - main
   workflow_dispatch:
 
 jobs:
