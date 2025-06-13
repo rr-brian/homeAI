@@ -33,6 +33,18 @@ jobs:
         cd backend
         pip install -r requirements.txt
         
+    - name: Check startup script
+      run: |
+        ls -la
+        if [ -f _startup.sh ]; then
+          echo "_startup.sh exists"
+          chmod +x _startup.sh
+          cat _startup.sh
+        else
+          echo "ERROR: _startup.sh does not exist"
+          exit 1
+        fi
+        
     - name: Login to Azure
       uses: azure/login@v1
       with:
