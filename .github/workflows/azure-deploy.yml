@@ -52,6 +52,6 @@ jobs:
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v2
       with:
-        app-name: 'rts-search-app' # Update this if you chose a different name
+        app-name: 'rts-search-app-new' # Updated to the new App Service name
         slot-name: 'production'
         package: .
