@@ -1,9 +1,47 @@
 import os
+import sys
 import logging
+
+# Add the rt_search module to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+# Now import the modules
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from rt_search.search_client import SearchClient
-from rt_search.env_loader import load_env
+
+# Try different import approaches for rt_search
+try:
+    from rt_search.search_client import SearchClient
+    from rt_search.env_loader import load_env
+    print("Successfully imported rt_search modules")
+except ImportError as e:
+    print(f"Error importing rt_search: {e}")
+    print(f"Python path: {sys.path}")
+    print(f"Current directory: {os.getcwd()}")
+    print(f"Directory contents: {os.listdir(os.getcwd())}")
+    print(f"Backend directory contents: {os.listdir(os.path.join(os.getcwd(), 'backend'))}")
+    
+    # Try an alternative import approach
+    try:
+        sys.path.append(os.path.join(os.getcwd(), 'backend'))
+        from backend.rt_search.search_client import SearchClient
+        from backend.rt_search.env_loader import load_env
+        print("Successfully imported rt_search modules using alternative path")
+    except ImportError as e2:
+        print(f"Alternative import also failed: {e2}")
+        # Create dummy versions of the required classes/functions to prevent startup failure
+        class SearchClient:
+            def __init__(self):
+                self.cognitive_search_client = None
+                print("WARNING: Using dummy SearchClient")
+                
+            def search_contract_language(self, query):
+                return [{"error": "SearchClient not properly initialized"}]
+                
+        def load_env():
+            print("WARNING: Using dummy load_env function")
+            
 from flask import send_from_directory
 
 # Configure logging
